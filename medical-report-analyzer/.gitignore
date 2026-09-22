@@ -1,0 +1,134 @@
+# ──────────────────────────────────────────────
+# AI-Based Medical Report Analyzer — .gitignore
+# ──────────────────────────────────────────────
+
+# ───────────── Python ─────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+eggs/
+parts/
+var/
+sdist/
+develop-eggs/
+.installed.cfg
+lib/
+lib64/
+.Python
+*.pyo
+*.pyd
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Virtual Environments
+.venv/
+venv/
+ENV/
+env/
+.env.local
+.env.*.local
+env.bak/
+venv.bak/
+
+# pytest / coverage
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+nosetests.xml
+coverage.xml
+*.cover
+*.log
+
+# mypy / pyright
+.mypy_cache/
+.dmypy.json
+dmypy.json
+.pyright/
+
+# ───────────── Node / Frontend ─────────────
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.pnpm-debug.log*
+.npm
+.yarn/cache
+.yarn/unplugged
+.yarn/build-state.yml
+.yarn/install-state.gz
+.pnp.*
+
+# Vite / Build output
+frontend/dist/
+frontend/.vite/
+frontend/build/
+.cache/
+
+# TypeScript
+*.tsbuildinfo
+
+# ───────────── Environment & Secrets ─────────────
+.env
+.env.*
+!.env.example
+!backend/.env.example
+*.key
+*.pem
+secrets/
+
+# ───────────── Uploads (user files) ─────────────
+backend/uploads/*
+!backend/uploads/.gitkeep
+
+# ───────────── Docker ─────────────
+docker-compose.override.yml
+
+# ───────────── ML / Data ─────────────
+data/raw/*
+!data/raw/.gitkeep
+data/processed/*
+!data/processed/.gitkeep
+data/annotations/*
+!data/annotations/.gitkeep
+data/datasets/*
+!data/datasets/.gitkeep
+
+models/ocr/*
+!models/ocr/.gitkeep
+models/nlp/*
+!models/nlp/.gitkeep
+models/disease_prediction/*
+!models/disease_prediction/.gitkeep
+models/explainability/*
+!models/explainability/.gitkeep
+
+# MLflow artifacts
+mlruns/
+mlartifacts/
+
+# Jupyter Notebooks checkpoints
+notebooks/.ipynb_checkpoints/
+notebooks/**/.ipynb_checkpoints/
+*.ipynb_checkpoints
+
+# ───────────── IDE / OS ─────────────
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# ───────────── Logs ─────────────
+*.log
+logs/
