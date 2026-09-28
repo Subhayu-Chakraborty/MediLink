@@ -3,16 +3,19 @@
  * Search doctor by ID and send connection request.
  */
 import { useState, type FC } from 'react'
-import { searchDoctor } from '../../services/doctorService'
+import { getNearbyDoctors, searchDoctor } from '../../services/doctorService'
 import { sendDoctorRequest } from '../../services/patientService'
-import type { DoctorSearchResult } from '../../types/doctor.types'
+import type { DoctorSearchResult, NearbyDoctorResult } from '../../types/doctor.types'
 import LoadingSpinner from '../common/LoadingSpinner'
 
 const DoctorSearch: FC = () => {
   const [doctorId, setDoctorId] = useState('')
   const [result, setResult] = useState<DoctorSearchResult | null>(null)
+  const [nearbyDoctors, setNearbyDoctors] = useState<NearbyDoctorResult[]>([])
   const [searching, setSearching] = useState(false)
-  const [sending, setSending] = useState(false)
+  const [locating, setLocating] = useState(false)
+  const [sendingDoctorId, setSendingDoctorId] = useState<string | null>(null)
+  const [radiusKm, setRadiusKm] = useState(10)
   const [searchError, setSearchError] = useState('')
   const [successMsg, setSuccessMsg] = useState('')
 
@@ -33,19 +36,52 @@ const DoctorSearch: FC = () => {
     }
   }
 
-  const handleSendRequest = async () => {
-    if (!result) return
-    setSending(true)
+  const handleFindNearby = () => {
+    setSearchError('')
+    setSuccessMsg('')
+    setNearbyDoctors([])
+
+    if (!('geolocation' in navigator)) {
+      setSearchError('Location services are not available in this browser.')
+      return
+    }
+
+    setLocating(true)
+    navigator.geolocation.getCurrentPosition(
+      async position => {
+        try {
+          const { latitude, longitude } = position.coords
+          const doctors = await getNearbyDoctors(latitude, longitude, radiusKm)
+          setNearbyDoctors(doctors)
+          if (doctors.length === 0) {
+            setSearchError('No doctors with saved practice locations were found in this radius.')
+          }
+        } catch {
+          setSearchError('Unable to find nearby doctors right now.')
+        } finally {
+          setLocating(false)
+        }
+      },
+      () => {
+        setSearchError('Allow location access to find nearby doctors.')
+        setLocating(false)
+      },
+      { enableHighAccuracy: true, timeout: 10000 },
+    )
+  }
+
+  const handleSendRequest = async (doctor: Pick<DoctorSearchResult, 'doctor_id'>) => {
+    setSendingDoctorId(doctor.doctor_id)
     setSuccessMsg('')
     setSearchError('')
     try {
-      const res = await sendDoctorRequest(result.doctor_id)
+      const res = await sendDoctorRequest(doctor.doctor_id)
       setSuccessMsg(res.message)
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail
       setSearchError(msg || 'Failed to send request.')
     } finally {
-      setSending(false)
+      setSendingDoctorId(null)
     }
   }
 
@@ -66,6 +102,27 @@ const DoctorSearch: FC = () => {
         <button onClick={handleSearch} disabled={searching || !doctorId.trim()} className="btn-primary">
           {searching ? <LoadingSpinner size="sm" /> : 'Search'}
         </button>
+      </div>
+
+      <div className="mt-4 pt-4 border-t border-slate-200">
+        <div className="flex items-end gap-2">
+          <label className="form-group flex-1">
+            <span className="form-label">Nearby radius</span>
+            <select
+              className="form-select"
+              value={radiusKm}
+              onChange={e => setRadiusKm(Number(e.target.value))}
+            >
+              <option value={5}>5 km</option>
+              <option value={10}>10 km</option>
+              <option value={25}>25 km</option>
+              <option value={50}>50 km</option>
+            </select>
+          </label>
+          <button onClick={handleFindNearby} disabled={locating} className="btn-secondary shrink-0">
+            {locating ? <LoadingSpinner size="sm" /> : 'Use GPS'}
+          </button>
+        </div>
       </div>
 
       {searchError && (
@@ -94,10 +151,42 @@ const DoctorSearch: FC = () => {
                 {result.hospital && <span>📍 {result.hospital}</span>}
               </div>
             </div>
-            <button onClick={handleSendRequest} disabled={sending} className="btn-primary btn-sm shrink-0">
-              {sending ? <LoadingSpinner size="sm" /> : 'Send Request'}
+            <button
+              onClick={() => handleSendRequest(result)}
+              disabled={sendingDoctorId === result.doctor_id}
+              className="btn-primary btn-sm shrink-0"
+            >
+              {sendingDoctorId === result.doctor_id ? <LoadingSpinner size="sm" /> : 'Send Request'}
             </button>
           </div>
+        </div>
+      )}
+
+      {nearbyDoctors.length > 0 && (
+        <div className="mt-4 flex flex-col gap-2">
+          <p className="text-xs font-medium text-slate-500">Nearby doctors</p>
+          {nearbyDoctors.map(doctor => (
+            <div key={doctor.user_id} className="border border-slate-200 rounded-lg p-3 bg-slate-50">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="font-semibold text-slate-800 text-sm truncate">{doctor.full_name}</p>
+                  <p className="text-xs text-blue-600 font-mono">{doctor.doctor_id}</p>
+                  <div className="mt-2 flex flex-wrap gap-2 text-xs text-slate-600">
+                    <span className="badge bg-blue-50 text-blue-700">{doctor.specialization}</span>
+                    <span>{doctor.distance_km} km away</span>
+                    {doctor.hospital && <span className="truncate">{doctor.hospital}</span>}
+                  </div>
+                </div>
+                <button
+                  onClick={() => handleSendRequest(doctor)}
+                  disabled={sendingDoctorId === doctor.doctor_id}
+                  className="btn-primary btn-sm shrink-0"
+                >
+                  {sendingDoctorId === doctor.doctor_id ? <LoadingSpinner size="sm" /> : 'Connect'}
+                </button>
+              </div>
+            </div>
+          ))}
         </div>
       )}
     </div>

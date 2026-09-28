@@ -11,11 +11,9 @@ Architecture: Routes → ReportService → Beanie + file_utils
 from __future__ import annotations
 
 import logging
-from datetime import datetime
 from pathlib import Path
 from typing import List
 
-from bson import ObjectId
 from fastapi import HTTPException, UploadFile, status
 
 from app.core.config import settings
@@ -28,6 +26,8 @@ from app.utils.file_utils import (
     validate_content_type,
     validate_file_extension,
 )
+from app.utils.link_utils import user_reference
+from app.utils.time_utils import utc_now
 
 logger = logging.getLogger(__name__)
 
@@ -70,6 +70,11 @@ async def save_report(file: UploadFile, patient_user: User) -> MedicalReport:
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"File size exceeds the {settings.MAX_FILE_SIZE_MB} MB limit.",
         )
+    if not content.startswith(b"%PDF-"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="The uploaded file is not a valid PDF document.",
+        )
 
     # Generate unique filename and save to disk
     stored_name = generate_unique_filename(file.filename or "report.pdf")
@@ -94,7 +99,7 @@ async def save_report(file: UploadFile, patient_user: User) -> MedicalReport:
 async def list_reports(patient_user_id: str) -> List[ReportListItem]:
     """Return all MedicalReport documents for the authenticated patient."""
     reports = await MedicalReport.find(
-        MedicalReport.patient.id == ObjectId(patient_user_id),  # type: ignore[attr-defined]
+        {"patient": user_reference(patient_user_id)},
     ).sort(-MedicalReport.uploaded_at).to_list()
 
     return [
@@ -152,7 +157,7 @@ async def update_report_status(
         report.extracted_text = extracted_text
     if analysis_result is not None:
         report.analysis_result = analysis_result
-        report.analyzed_at = datetime.utcnow()
+        report.analyzed_at = utc_now()
     if error_message is not None:
         report.error_message = error_message
     await report.save()

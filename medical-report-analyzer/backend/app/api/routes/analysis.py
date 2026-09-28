@@ -8,7 +8,6 @@ This route orchestrates: text extraction → Ollama analysis → result storage.
 from __future__ import annotations
 
 import logging
-from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, status
 
@@ -18,6 +17,7 @@ from app.models.user import User
 from app.schemas.analysis import AnalysisResult, AnalysisTriggerResponse, DiseaseRisks, DiseaseRiskItem, MedicalParameter
 from app.services import ollama_service, report_service, text_extraction_service
 from app.services.report_service import update_report_status
+from app.utils.time_utils import utc_now
 
 logger = logging.getLogger(__name__)
 
@@ -172,5 +172,5 @@ async def get_analysis_results(
         summary=raw.get("summary", ""),
         parameters=parameters,
         disease_risks=disease_risks,
-        analyzed_at=report.analyzed_at or datetime.utcnow(),
+        analyzed_at=report.analyzed_at or utc_now(),
     )

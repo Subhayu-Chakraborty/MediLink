@@ -67,6 +67,7 @@ pnpm-debug.log*
 
 # Vite / Build output
 frontend/dist/
+frontend/dist-test/
 frontend/.vite/
 frontend/build/
 .cache/

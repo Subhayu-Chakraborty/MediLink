@@ -9,7 +9,7 @@ from __future__ import annotations
 from typing import Optional
 from datetime import datetime
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class PatientProfileResponse(BaseModel):
@@ -17,7 +17,7 @@ class PatientProfileResponse(BaseModel):
     user_id: str
     full_name: str
     email: str
-    age: Optional[int] = None
+    age: Optional[int] = Field(default=None, ge=0, le=130)
     gender: Optional[str] = None
     blood_group: Optional[str] = None
     phone: Optional[str] = None
@@ -43,6 +43,7 @@ class SendDoctorRequestPayload(BaseModel):
 class DoctorRequestStatusItem(BaseModel):
     """Status of a single doctor connection request sent by the patient."""
     request_id: str
+    doctor_user_id: str
     doctor_id: str
     doctor_name: str
     doctor_specialization: str

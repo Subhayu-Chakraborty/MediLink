@@ -31,6 +31,8 @@ export interface RegisterRequest {
   specialization?: string
   experience?: number
   hospital?: string
+  latitude?: number
+  longitude?: number
   // Patient extras
   age?: number
   gender?: string

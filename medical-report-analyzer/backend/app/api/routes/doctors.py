@@ -13,8 +13,10 @@ from fastapi import APIRouter, Depends, Query
 from app.api.dependencies import require_doctor_role, get_current_user
 from app.models.user import User
 from app.schemas.doctor import (
+    DoctorProfileUpdateRequest,
     DoctorProfileResponse,
     DoctorSearchResult,
+    NearbyDoctorResult,
     PatientRequestItem,
     PatientSummary,
     RespondToRequestPayload,
@@ -51,6 +53,34 @@ async def get_my_profile(
 ) -> DoctorProfileResponse:
     """Return the full profile for the authenticated doctor."""
     return await doctor_service.get_doctor_profile(str(current_user.id))
+
+
+@router.patch(
+    "/profile",
+    response_model=DoctorProfileResponse,
+    summary="Update the logged-in doctor's profile",
+)
+async def update_my_profile(
+    payload: DoctorProfileUpdateRequest,
+    current_user: User = Depends(require_doctor_role),
+) -> DoctorProfileResponse:
+    """Partially update the authenticated doctor's profile and practice location."""
+    return await doctor_service.update_doctor_profile(str(current_user.id), payload)
+
+
+@router.get(
+    "/nearby",
+    response_model=List[NearbyDoctorResult],
+    summary="Find doctors near a latitude/longitude point",
+)
+async def get_nearby_doctors(
+    lat: float = Query(..., ge=-90, le=90),
+    lng: float = Query(..., ge=-180, le=180),
+    radius_km: float = Query(10.0, gt=0, le=100),
+    _current_user: User = Depends(get_current_user),
+) -> List[NearbyDoctorResult]:
+    """Return doctors with saved practice coordinates sorted by distance."""
+    return await doctor_service.get_nearby_doctors(lat, lng, radius_km)
 
 
 @router.get(

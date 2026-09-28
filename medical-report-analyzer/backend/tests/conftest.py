@@ -1,24 +1,48 @@
-﻿"""
-tests/conftest.py
-──────────────────
-pytest fixtures shared across all test modules.
+"""Shared integration fixtures for the FastAPI backend."""
 
-Provides:
-  - A FastAPI TestClient configured with an in-memory test database.
-  - Helper fixtures for creating test users (patient and doctor).
+from __future__ import annotations
 
-# TODO: Implement in Phase 1
-"""
+import os
+from typing import Callable
+from uuid import uuid4
 
 import pytest
 from fastapi.testclient import TestClient
-from app.main import app
 
-# TODO: Implement in Phase 1 — override database dependency for testing
+# Tests must never read or write the developer's persistent Atlas database.
+os.environ["USE_IN_MEMORY_DB"] = "true"
+os.environ["DATABASE_NAME"] = "medical_report_analyzer_test"
+os.environ["AI_MODE"] = "offline"
+
+from app.main import app
 
 
 @pytest.fixture(scope="session")
 def client() -> TestClient:
-    """FastAPI test client fixture."""
-    # TODO: Implement in Phase 1
-    return TestClient(app)
+    with TestClient(app) as test_client:
+        yield test_client
+
+
+@pytest.fixture
+def register_user(client: TestClient) -> Callable[..., dict]:
+    def register(role: str = "patient", **overrides: object) -> dict:
+        unique = uuid4().hex
+        payload: dict[str, object] = {
+            "full_name": f"Test {role.title()}",
+            "email": f"{role}-{unique}@example.com",
+            "password": "Pass123!",
+            "role": role,
+        }
+        if role == "doctor":
+            payload["specialization"] = "General Medicine"
+        payload.update(overrides)
+
+        response = client.post("/auth/register", json=payload)
+        assert response.status_code == 201, response.text
+        return response.json()
+
+    return register
+
+
+def auth_headers(token_response: dict) -> dict[str, str]:
+    return {"Authorization": f"Bearer {token_response['access_token']}"}

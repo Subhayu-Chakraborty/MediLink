@@ -15,6 +15,7 @@ from beanie import Document, Indexed, Link
 from pydantic import Field
 
 from app.models.user import User
+from app.utils.time_utils import utc_now
 
 
 class DoctorProfile(Document):
@@ -27,7 +28,9 @@ class DoctorProfile(Document):
     hospital: Optional[str] = None
     phone: Optional[str] = None
     bio: Optional[str] = None
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    created_at: datetime = Field(default_factory=utc_now)
 
     class Settings:
         name = "doctor_profiles"

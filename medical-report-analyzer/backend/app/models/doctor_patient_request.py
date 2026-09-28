@@ -16,6 +16,7 @@ from beanie import Document, Link
 from pydantic import Field
 
 from app.models.user import User
+from app.utils.time_utils import utc_now
 
 
 class RequestStatus(str, Enum):
@@ -30,7 +31,7 @@ class DoctorPatientRequest(Document):
     patient: Link[User]
     doctor: Link[User]
     status: RequestStatus = RequestStatus.PENDING
-    requested_at: datetime = Field(default_factory=datetime.utcnow)
+    requested_at: datetime = Field(default_factory=utc_now)
     responded_at: Optional[datetime] = None
 
     class Settings:

@@ -10,12 +10,14 @@ import {
   getPendingRequests,
   respondToRequest,
   getMyPatients,
+  updateMyProfile,
 } from '../../services/doctorService'
 import type { DoctorProfile, PatientRequestItem, PatientSummary } from '../../types/doctor.types'
 import RequestCard from '../../components/doctor/RequestCard'
 import PatientList from '../../components/doctor/PatientList'
 import PatientReportView from '../../components/doctor/PatientReportView'
 import LoadingSpinner from '../../components/common/LoadingSpinner'
+import ChatWindow from '../../components/common/ChatWindow'
 
 const DoctorDashboard: FC = () => {
   const { user } = useAuth()
@@ -25,6 +27,8 @@ const DoctorDashboard: FC = () => {
   const [selectedPatient, setSelectedPatient] = useState<PatientSummary | null>(null)
   const [loadingInit, setLoadingInit] = useState(true)
   const [respondingId, setRespondingId] = useState<string | null>(null)
+  const [savingLocation, setSavingLocation] = useState(false)
+  const [locationMessage, setLocationMessage] = useState('')
   const [activeTab, setActiveTab] = useState<'overview' | 'requests' | 'patients'>('overview')
 
   const loadData = async () => {
@@ -50,6 +54,35 @@ const DoctorDashboard: FC = () => {
       await loadData()  // refresh
     } catch { /* ignore */ }
     finally { setRespondingId(null) }
+  }
+
+  const handleSaveCurrentLocation = () => {
+    setLocationMessage('')
+    if (!('geolocation' in navigator)) {
+      setLocationMessage('Location services are not available in this browser.')
+      return
+    }
+
+    setSavingLocation(true)
+    navigator.geolocation.getCurrentPosition(
+      async position => {
+        try {
+          const { latitude, longitude } = position.coords
+          const updated = await updateMyProfile({ latitude, longitude })
+          setProfile(updated)
+          setLocationMessage('Practice location saved.')
+        } catch {
+          setLocationMessage('Unable to save location.')
+        } finally {
+          setSavingLocation(false)
+        }
+      },
+      () => {
+        setLocationMessage('Allow location access to save your practice location.')
+        setSavingLocation(false)
+      },
+      { enableHighAccuracy: true, timeout: 10000 },
+    )
   }
 
   if (loadingInit) return (
@@ -129,6 +162,26 @@ const DoctorDashboard: FC = () => {
                   <p className="text-xs text-slate-400">
                     Share your Doctor ID (<strong className="font-mono text-blue-600">{profile?.doctor_id}</strong>) with patients so they can connect with you.
                   </p>
+                </div>
+                <div className="mt-4 pt-3 border-t border-slate-200">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-medium text-slate-700">Practice location</p>
+                      <p className="text-xs text-slate-400">
+                        {profile?.latitude && profile?.longitude
+                          ? `${profile.latitude.toFixed(4)}, ${profile.longitude.toFixed(4)}`
+                          : 'No GPS location saved'}
+                      </p>
+                    </div>
+                    <button
+                      onClick={handleSaveCurrentLocation}
+                      disabled={savingLocation}
+                      className="btn-secondary btn-sm shrink-0"
+                    >
+                      {savingLocation ? <LoadingSpinner size="sm" /> : 'Use GPS'}
+                    </button>
+                  </div>
+                  {locationMessage && <p className="text-xs text-slate-500 mt-2">{locationMessage}</p>}
                 </div>
               </div>
             </div>
@@ -214,10 +267,16 @@ const DoctorDashboard: FC = () => {
             </div>
             <div className="lg:col-span-3 card">
               {selectedPatient ? (
-                <PatientReportView
-                  patientId={selectedPatient.user_id}
-                  patientName={selectedPatient.full_name}
-                />
+                <div className="flex flex-col gap-4">
+                  <PatientReportView
+                    patientId={selectedPatient.user_id}
+                    patientName={selectedPatient.full_name}
+                  />
+                  <ChatWindow
+                    receiverId={selectedPatient.user_id}
+                    receiverName={selectedPatient.full_name}
+                  />
+                </div>
               ) : (
                 <div className="flex items-center justify-center h-40 text-slate-400 text-sm">
                   Select a patient to view their reports.

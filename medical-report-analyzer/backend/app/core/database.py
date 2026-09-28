@@ -41,6 +41,7 @@ from app.models.doctor_profile import DoctorProfile
 from app.models.patient_profile import PatientProfile
 from app.models.doctor_patient_request import DoctorPatientRequest
 from app.models.medical_report import MedicalReport
+from app.models.chat_message import ChatMessage
 
 logger = logging.getLogger(__name__)
 
@@ -56,15 +57,19 @@ async def connect_to_mongo() -> None:
     """
     global _client, _database
 
-    logger.info("Connecting to MongoDB Atlas…")
-    # Use certifi's up-to-date CA bundle to fix the TLS handshake error
-    # ([SSL: TLSV1_ALERT_INTERNAL_ERROR]) that occurs on Windows with
-    # Python 3.10 / OpenSSL 1.1.1 when the system CA store is incomplete
-    # or incompatible with MongoDB Atlas's TLS requirements.
-    _client = AsyncIOMotorClient(
-        settings.MONGODB_URL,
-        tlsCAFile=certifi.where(),
-    )
+    if settings.USE_IN_MEMORY_DB:
+        from mongomock_motor import AsyncMongoMockClient
+
+        logger.warning(
+            "Using the in-memory development database. Data will reset when the API stops."
+        )
+        _client = AsyncMongoMockClient()
+    else:
+        logger.info("Connecting to MongoDB at the configured URL.")
+        client_options = {}
+        if settings.MONGODB_URL.startswith("mongodb+srv://"):
+            client_options["tlsCAFile"] = certifi.where()
+        _client = AsyncIOMotorClient(settings.MONGODB_URL, **client_options)
     _database = _client[settings.DATABASE_NAME]
 
     await init_beanie(
@@ -75,12 +80,11 @@ async def connect_to_mongo() -> None:
             PatientProfile,
             DoctorPatientRequest,
             MedicalReport,
+            ChatMessage,
         ],
     )
 
-    logger.info(
-        "MongoDB connection established. Database: '%s'", settings.DATABASE_NAME
-    )
+    logger.info("Database initialized: '%s'", settings.DATABASE_NAME)
 
 
 async def close_mongo_connection() -> None:

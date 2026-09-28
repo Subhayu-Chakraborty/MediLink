@@ -9,10 +9,8 @@ Architecture: Routes → PatientService → Beanie models
 from __future__ import annotations
 
 import logging
-from datetime import datetime
 from typing import List
 
-from bson import ObjectId
 from fastapi import HTTPException, status
 
 from app.models.doctor_patient_request import DoctorPatientRequest, RequestStatus
@@ -24,6 +22,8 @@ from app.schemas.patient import (
     PatientProfileResponse,
     PatientProfileUpdateRequest,
 )
+from app.utils.link_utils import user_reference
+from app.utils.time_utils import utc_now
 
 logger = logging.getLogger(__name__)
 
@@ -35,7 +35,7 @@ async def get_patient_profile(user_id: str) -> PatientProfileResponse:
         raise HTTPException(status_code=404, detail="User not found.")
 
     profile = await PatientProfile.find_one(
-        PatientProfile.user.id == ObjectId(user_id),  # type: ignore[attr-defined]
+        {"user": user_reference(user_id)},
     )
     if profile is None:
         raise HTTPException(status_code=404, detail="Patient profile not found.")
@@ -63,7 +63,7 @@ async def update_patient_profile(
         raise HTTPException(status_code=404, detail="User not found.")
 
     profile = await PatientProfile.find_one(
-        PatientProfile.user.id == ObjectId(user_id),  # type: ignore[attr-defined]
+        {"user": user_reference(user_id)},
     )
     if profile is None:
         raise HTTPException(status_code=404, detail="Patient profile not found.")
@@ -71,7 +71,7 @@ async def update_patient_profile(
     update_data = updates.model_dump(exclude_none=True)
     for field, value in update_data.items():
         setattr(profile, field, value)
-    profile.updated_at = datetime.utcnow()
+    profile.updated_at = utc_now()
     await profile.save()
 
     return PatientProfileResponse(
@@ -98,7 +98,6 @@ async def send_doctor_request(patient_user_id: str, doctor_id_str: str) -> dict:
     # Find the doctor by their public doctor_id
     doctor_profile = await DoctorProfile.find_one(
         DoctorProfile.doctor_id == doctor_id_str.strip().upper(),
-        fetch_links=True,
     )
     if doctor_profile is None:
         raise HTTPException(
@@ -106,15 +105,13 @@ async def send_doctor_request(patient_user_id: str, doctor_id_str: str) -> dict:
             detail=f"No doctor found with ID '{doctor_id_str}'.",
         )
 
+    await doctor_profile.fetch_link(DoctorProfile.user)
     doctor_user: User = doctor_profile.user  # type: ignore[assignment]
     doctor_user_id = str(doctor_user.id)
-    patient_obj_id = ObjectId(patient_user_id)
-    doctor_obj_id = ObjectId(doctor_user_id)
-
     # Check for existing request (any status)
     existing = await DoctorPatientRequest.find_one(
-        DoctorPatientRequest.patient.id == patient_obj_id,  # type: ignore[attr-defined]
-        DoctorPatientRequest.doctor.id == doctor_obj_id,    # type: ignore[attr-defined]
+        {"patient": user_reference(patient_user_id)},
+        {"doctor": user_reference(doctor_user_id)},
     )
     if existing is not None:
         raise HTTPException(
@@ -147,18 +144,19 @@ async def send_doctor_request(patient_user_id: str, doctor_id_str: str) -> dict:
 async def list_patient_requests(patient_user_id: str) -> List[DoctorRequestStatusItem]:
     """List all doctor connection requests sent by a patient."""
     requests = await DoctorPatientRequest.find(
-        DoctorPatientRequest.patient.id == ObjectId(patient_user_id),  # type: ignore[attr-defined]
-        fetch_links=True,
+        {"patient": user_reference(patient_user_id)},
     ).to_list()
 
     result = []
     for req in requests:
+        await req.fetch_link(DoctorPatientRequest.doctor)
         doctor_user: User = req.doctor  # type: ignore[assignment]
         doctor_profile = await DoctorProfile.find_one(
-            DoctorProfile.user.id == doctor_user.id,  # type: ignore[attr-defined]
+            {"user": user_reference(doctor_user.id)},
         )
         result.append(DoctorRequestStatusItem(
             request_id=str(req.id),
+            doctor_user_id=str(doctor_user.id),
             doctor_id=doctor_profile.doctor_id if doctor_profile else "UNKNOWN",
             doctor_name=doctor_user.full_name,
             doctor_specialization=doctor_profile.specialization if doctor_profile else "Unknown",

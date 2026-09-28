@@ -39,6 +39,10 @@ class Settings(BaseSettings):
         default="medical_report_analyzer",
         description="MongoDB database name.",
     )
+    USE_IN_MEMORY_DB: bool = Field(
+        default=True,
+        description="Use an in-memory MongoDB-compatible database for local development.",
+    )
 
     # ── JWT Authentication ─────────────────────────────────────────────────
     SECRET_KEY: str = Field(
@@ -55,8 +59,25 @@ class Settings(BaseSettings):
         default="http://localhost:11434", description="Base URL for local Ollama instance."
     )
     OLLAMA_MODEL: str = Field(
-        default="llama3", description="Ollama model to use for analysis."
+        default="llama3.2:1b", description="Ollama model to use for analysis."
     )
+    AI_MODE: str = Field(
+        default="offline",
+        description="Analysis provider: offline or ollama.",
+    )
+    OLLAMA_TIMEOUT_SECONDS: float = Field(
+        default=120.0,
+        gt=0,
+        description="Maximum wait time for an Ollama response.",
+    )
+
+    @field_validator("AI_MODE")
+    @classmethod
+    def validate_ai_mode(cls, value: str) -> str:
+        normalized = value.strip().lower()
+        if normalized not in {"offline", "ollama"}:
+            raise ValueError("AI_MODE must be either 'offline' or 'ollama'.")
+        return normalized
 
     # ── CORS ───────────────────────────────────────────────────────────────
     ALLOWED_ORIGINS: str | List[str] = Field(

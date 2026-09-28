@@ -24,7 +24,7 @@ from app.core.config import settings
 from app.core.database import connect_to_mongo, close_mongo_connection, ping_database
 
 # ── Route imports ──────────────────────────────────────────────────────────
-from app.api.routes import auth, doctors, patients, reports, analysis
+from app.api.routes import auth, chat, doctors, patients, reports, analysis
 
 logger = logging.getLogger(__name__)
 
@@ -83,6 +83,7 @@ def create_application() -> FastAPI:
     app.include_router(patients.router, prefix="/patients", tags=["Patients"])
     app.include_router(reports.router,  prefix="/reports",  tags=["Reports"])
     app.include_router(analysis.router, prefix="/analysis", tags=["Analysis"])
+    app.include_router(chat.router,     prefix="/chat",     tags=["Chat"])
 
     return app
 
@@ -105,5 +106,7 @@ async def health_check() -> dict:
         "status": "ok" if db_ok else "degraded",
         "environment": settings.ENVIRONMENT,
         "database": "connected" if db_ok else "unreachable",
+        "database_mode": "in-memory" if settings.USE_IN_MEMORY_DB else "persistent",
+        "analysis_mode": settings.AI_MODE,
         "version": "0.1.0",
     }

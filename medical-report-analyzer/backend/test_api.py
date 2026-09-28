@@ -2,7 +2,7 @@ import httpx
 import asyncio
 import time
 
-async def test_upload():
+async def run_upload_check():
     print("Testing API Upload endpoint...")
     async with httpx.AsyncClient(timeout=300) as client:
         # 1. Login to get token
@@ -42,4 +42,4 @@ async def test_upload():
             print(f"Error: {e}")
 
 if __name__ == "__main__":
-    asyncio.run(test_upload())
+    asyncio.run(run_upload_check())

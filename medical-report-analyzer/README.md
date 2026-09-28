@@ -13,7 +13,7 @@
 - [Running the Backend](#-running-the-backend-locally)
 - [Running the Frontend](#-running-the-frontend-locally)
 - [MongoDB Atlas Setup](#-mongodb-atlas-setup)
-- [Gemini API Key Setup](#-gemini-api-key-setup)
+- [Optional Ollama Setup](#-optional-ollama-setup)
 - [Docker Compose](#-running-with-docker-compose)
 - [MVP Scope vs Future Modules](#-mvp-scope-vs-future-modules)
 - [Development Roadmap](#-development-roadmap)
@@ -35,16 +35,16 @@ Patients generate medical lab reports regularly, but most people lack the medica
 ### Key Features (MVP — Phase 1)
 | Feature | Status |
 |---------|--------|
-| Patient registration & JWT authentication | 🔨 Scaffold |
-| Doctor registration with unique doctor_id | 🔨 Scaffold |
-| PDF medical report upload | 🔨 Scaffold |
-| Text extraction via PyMuPDF / pdfplumber | 🔨 Scaffold |
-| AI analysis via Google Gemini | 🔨 Scaffold |
-| Structured parameter extraction | 🔨 Scaffold |
-| Disease risk summary (Gemini-powered) | 🔨 Scaffold |
-| Patient dashboard | 🔨 Scaffold |
-| Doctor dashboard with patient management | 🔨 Scaffold |
-| Doctor–patient connection request system | 🔨 Scaffold |
+| Patient registration & JWT authentication | ✅ Complete |
+| Doctor registration with unique doctor_id | ✅ Complete |
+| PDF medical report upload | ✅ Complete |
+| Text extraction via PyMuPDF / pdfplumber | ✅ Complete |
+| Offline report analysis | ✅ Complete |
+| Ollama-powered report analysis | ✅ Optional |
+| Patient dashboard | ✅ Complete |
+| Doctor dashboard with patient management | ✅ Complete |
+| Doctor–patient connection and chat | ✅ Complete |
+| GPS-based nearby doctor discovery | ✅ Complete |
 
 ---
 
@@ -64,7 +64,7 @@ Patients generate medical lab reports regularly, but most people lack the medica
 | passlib[bcrypt] | 1.7.4 | Password hashing |
 | python-multipart | 0.0.9 | File upload support |
 | python-dotenv | 1.0.1 | .env file loading |
-| google-generativeai | 0.5.4 | Gemini API client |
+| httpx | 0.27.0 | Ollama API client |
 | PyMuPDF | 1.24.3 | Primary PDF text extraction |
 | pdfplumber | 0.11.0 | Fallback PDF extraction |
 | httpx | 0.27.0 | Async HTTP client |
@@ -157,16 +157,19 @@ medical-report-analyzer/
 
 ## 🔐 Environment Variables
 
-Copy `backend/.env.example` to `backend/.env` and fill in your values.
+Copy `backend/.env.example` to `backend/.env`. The defaults run without external services.
 
 | Variable | Required | Description |
 |----------|----------|-------------|
-| `MONGODB_URL` | ✅ | Full MongoDB Atlas connection string |
+| `MONGODB_URL` | Production | Full MongoDB Atlas connection string |
 | `DATABASE_NAME` | ✅ | MongoDB database name (default: `medical_report_analyzer`) |
+| `USE_IN_MEMORY_DB` | ✅ | `true` for zero-setup local use; `false` for MongoDB |
 | `SECRET_KEY` | ✅ | Secret key for JWT signing — use `openssl rand -hex 32` |
 | `ALGORITHM` | ✅ | JWT algorithm (default: `HS256`) |
 | `ACCESS_TOKEN_EXPIRE_MINUTES` | ✅ | Token lifetime in minutes (default: `30`) |
-| `GEMINI_API_KEY` | ✅ | Your Google AI Studio API key |
+| `AI_MODE` | ✅ | `offline` or `ollama` |
+| `OLLAMA_BASE_URL` | Ollama only | Local Ollama service URL |
+| `OLLAMA_MODEL` | Ollama only | Installed model name |
 | `ALLOWED_ORIGINS` | ✅ | CORS allowed origins (default: `http://localhost:5173`) |
 | `UPLOAD_DIR` | ✅ | Directory for uploaded files (default: `uploads`) |
 | `MAX_FILE_SIZE_MB` | ✅ | Upload size limit in MB (default: `10`) |
@@ -179,8 +182,8 @@ Copy `backend/.env.example` to `backend/.env` and fill in your values.
 ### Prerequisites
 - Python 3.10+
 - pip
-- MongoDB Atlas account with a cluster (see below)
-- Google AI Studio API key (see below)
+- MongoDB Atlas only when persistent storage is required
+- Ollama only when local LLM analysis is required
 
 ### Steps
 
@@ -201,7 +204,7 @@ pip install -r requirements.txt
 # 4. Set up environment variables
 copy .env.example .env     # Windows
 # cp .env.example .env     # macOS/Linux
-# Then edit .env and fill in your MONGODB_URL, GEMINI_API_KEY, SECRET_KEY
+# The default file uses an in-memory database and offline analysis.
 
 # 5. Create the uploads directory (if it doesn't exist)
 mkdir -p uploads
@@ -260,15 +263,16 @@ The frontend will be available at: **http://localhost:5173**
 
 ---
 
-## 🤖 Gemini API Key Setup
+## 🤖 Optional Ollama Setup
 
-1. Go to [https://aistudio.google.com/app/apikey](https://aistudio.google.com/app/apikey).
-2. Sign in with your Google account.
-3. Click **"Create API Key"** → select your Google Cloud project (or create one).
-4. Copy the generated API key.
-5. Paste it as `GEMINI_API_KEY` in your `backend/.env` file.
+The backend defaults to conservative offline extraction and does not make clinical
+risk predictions. For local LLM analysis, install Ollama, download a model, and set:
 
-> **Free tier**: Gemini API has a generous free tier. The `gemini-1.5-flash` model is recommended for this project for speed and cost efficiency.
+```env
+AI_MODE=ollama
+OLLAMA_BASE_URL=http://localhost:11434
+OLLAMA_MODEL=llama3.2:1b
+```
 
 ---
 
@@ -352,7 +356,7 @@ Patient dashboard      Improved accuracy       S3 file storage
 Doctor dashboard       Multi-page support      Production deploy
 ```
 
-**Current Phase**: 🏗️ **Phase 1 — Scaffold Complete, Implementation in Progress**
+**Current Phase**: ✅ **Phase 1 MVP complete**
 
 ---
 

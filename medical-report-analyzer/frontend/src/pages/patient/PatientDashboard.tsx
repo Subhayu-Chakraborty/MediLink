@@ -13,6 +13,7 @@ import DoctorSearch from '../../components/patient/DoctorSearch'
 import ReportUpload from '../../components/patient/ReportUpload'
 import AnalysisSummary from '../../components/patient/AnalysisSummary'
 import LoadingSpinner from '../../components/common/LoadingSpinner'
+import ChatWindow from '../../components/common/ChatWindow'
 
 const PatientDashboard: FC = () => {
   const { user } = useAuth()
@@ -127,11 +128,16 @@ const PatientDashboard: FC = () => {
                 {connectedDoctors.length > 0 ? (
                   <div className="flex flex-col gap-2">
                     {connectedDoctors.map(r => (
-                      <div key={r.request_id} className="flex items-center gap-2 text-sm">
-                        <span className="badge-accepted">Connected</span>
-                        <div>
-                          <p className="font-medium text-slate-700">{r.doctor_name}</p>
-                          <p className="text-xs text-slate-400">{r.doctor_specialization}</p>
+                      <div key={r.request_id} className="border border-slate-200 rounded-lg p-3">
+                        <div className="flex items-center gap-2 text-sm">
+                          <span className="badge-accepted">Connected</span>
+                          <div>
+                            <p className="font-medium text-slate-700">{r.doctor_name}</p>
+                            <p className="text-xs text-slate-400">{r.doctor_specialization}</p>
+                          </div>
+                        </div>
+                        <div className="mt-3">
+                          <ChatWindow receiverId={r.doctor_user_id} receiverName={`Dr. ${r.doctor_name}`} />
                         </div>
                       </div>
                     ))}

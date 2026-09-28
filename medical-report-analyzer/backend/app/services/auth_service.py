@@ -52,7 +52,8 @@ async def register_user(payload: RegisterRequest) -> TokenResponse:
       5. Return a JWT access token.
     """
     # 1. Check email uniqueness
-    existing = await User.find_one(User.email == payload.email)
+    normalized_email = str(payload.email).strip().lower()
+    existing = await User.find_one(User.email == normalized_email)
     if existing is not None:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -71,34 +72,41 @@ async def register_user(payload: RegisterRequest) -> TokenResponse:
 
     # 3. Create User document
     user = User(
-        email=payload.email,
+        email=normalized_email,
         hashed_password=hashed,
         full_name=payload.full_name,
         role=payload.role,
     )
     await user.insert()
 
-    # 4. Create profile
-    if payload.role == UserRole.DOCTOR:
-        doctor_id = await _ensure_unique_doctor_id()
-        profile = DoctorProfile(
-            user=user,
-            doctor_id=doctor_id,
-            specialization=payload.specialization or "General",
-            experience=payload.experience or 0,
-            hospital=payload.hospital,
-        )
-        await profile.insert()
-        logger.info("Doctor registered: %s (doctor_id=%s)", user.email, doctor_id)
-    else:
-        profile = PatientProfile(
-            user=user,
-            age=payload.age,
-            gender=payload.gender,
-            phone=payload.phone,
-        )
-        await profile.insert()
-        logger.info("Patient registered: %s", user.email)
+    # 4. Create profile. Remove the user if profile creation fails so
+    # registration cannot leave an unusable account behind.
+    try:
+        if payload.role == UserRole.DOCTOR:
+            doctor_id = await _ensure_unique_doctor_id()
+            profile = DoctorProfile(
+                user=user,
+                doctor_id=doctor_id,
+                specialization=payload.specialization or "General",
+                experience=payload.experience or 0,
+                hospital=payload.hospital,
+                latitude=payload.latitude,
+                longitude=payload.longitude,
+            )
+            await profile.insert()
+            logger.info("Doctor registered: %s (doctor_id=%s)", user.email, doctor_id)
+        else:
+            profile = PatientProfile(
+                user=user,
+                age=payload.age,
+                gender=payload.gender,
+                phone=payload.phone,
+            )
+            await profile.insert()
+            logger.info("Patient registered: %s", user.email)
+    except Exception:
+        await user.delete()
+        raise
 
     # 5. Issue JWT
     token = create_access_token(
@@ -124,7 +132,8 @@ async def login_user(payload: LoginRequest) -> TokenResponse:
     Returns a JWT access token on success.
     Raises HTTP 401 on invalid credentials.
     """
-    user = await User.find_one(User.email == payload.email)
+    normalized_email = str(payload.email).strip().lower()
+    user = await User.find_one(User.email == normalized_email)
 
     if user is None or not verify_password(payload.password, user.hashed_password):
         raise HTTPException(

@@ -3,7 +3,14 @@
  * Doctor API calls: search, profile, requests, patients.
  */
 import api from './api'
-import type { DoctorProfile, DoctorSearchResult, PatientRequestItem, PatientSummary } from '../types/doctor.types'
+import type {
+  DoctorProfile,
+  DoctorProfileUpdate,
+  DoctorSearchResult,
+  NearbyDoctorResult,
+  PatientRequestItem,
+  PatientSummary,
+} from '../types/doctor.types'
 import type { ReportDetail, ReportListItem } from '../types/report.types'
 
 export async function searchDoctor(doctorId: string): Promise<DoctorSearchResult> {
@@ -13,6 +20,18 @@ export async function searchDoctor(doctorId: string): Promise<DoctorSearchResult
 
 export async function getMyProfile(): Promise<DoctorProfile> {
   const res = await api.get<DoctorProfile>('/doctors/profile')
+  return res.data
+}
+
+export async function updateMyProfile(data: DoctorProfileUpdate): Promise<DoctorProfile> {
+  const res = await api.patch<DoctorProfile>('/doctors/profile', data)
+  return res.data
+}
+
+export async function getNearbyDoctors(lat: number, lng: number, radiusKm = 10): Promise<NearbyDoctorResult[]> {
+  const res = await api.get<NearbyDoctorResult[]>('/doctors/nearby', {
+    params: { lat, lng, radius_km: radiusKm },
+  })
   return res.data
 }
 

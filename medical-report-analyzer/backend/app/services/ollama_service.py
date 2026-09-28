@@ -18,6 +18,7 @@ from fastapi import HTTPException, status
 
 from app.core.config import settings
 from app.ai.ollama.prompts import build_analysis_prompt, SYSTEM_CONTEXT
+from app.services.offline_analysis_service import analyse_report_text_offline
 
 logger = logging.getLogger(__name__)
 
@@ -43,6 +44,10 @@ async def analyse_report_text(extracted_text: str) -> Dict[str, Any]:
             detail="Extracted text is too short to analyse. Please upload a valid medical report.",
         )
 
+    if settings.AI_MODE == "offline":
+        logger.info("Using conservative offline report analysis.")
+        return analyse_report_text_offline(extracted_text)
+
     prompt = build_analysis_prompt(extracted_text)
     
     # We combine system and prompt for models that don't support system roles, 
@@ -63,7 +68,7 @@ async def analyse_report_text(extracted_text: str) -> Dict[str, Any]:
 
     try:
         logger.info("Sending report text (%d chars) to Ollama (%s)…", len(extracted_text), settings.OLLAMA_MODEL)
-        async with httpx.AsyncClient(timeout=600.0) as client:
+        async with httpx.AsyncClient(timeout=settings.OLLAMA_TIMEOUT_SECONDS) as client:
             response = await client.post(url, json=payload)
             response.raise_for_status()
             raw_text = response.json().get("response", "")

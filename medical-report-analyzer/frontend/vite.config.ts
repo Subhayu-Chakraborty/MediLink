@@ -48,6 +48,14 @@ export default defineConfig({
         proxyTimeout: 300000,
         timeout: 300000,
       },
+      '/chat': {
+        target: 'http://localhost:8000',
+        changeOrigin: true,
+        secure: false,
+        ws: true,
+        proxyTimeout: 300000,
+        timeout: 300000,
+      },
       '/health': {
         target: 'http://localhost:8000',
         changeOrigin: true,

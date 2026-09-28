@@ -47,10 +47,7 @@ async def require_patient_role(
     current_user: User = Depends(get_current_user),
 ) -> User:
     """Enforce that the authenticated user has the 'patient' role."""
-    # Compare against both the enum and its string value to be safe across Pydantic/Beanie serialization
-    print(f"DEBUG: require_patient_role - current_user={current_user.email}, role={current_user.role}")
     if current_user.role != UserRole.PATIENT and getattr(current_user.role, "value", current_user.role) != "patient":
-        print("DEBUG: require_patient_role - FORBIDDEN")
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="This endpoint is only accessible to patients.",

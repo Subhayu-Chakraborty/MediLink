@@ -9,10 +9,9 @@ Architecture: Routes → DoctorService → Beanie models
 from __future__ import annotations
 
 import logging
-from datetime import datetime
+import math
 from typing import List
 
-from bson import ObjectId
 from fastapi import HTTPException, status
 
 from app.models.doctor_profile import DoctorProfile
@@ -23,9 +22,13 @@ from app.models.user import User
 from app.schemas.doctor import (
     DoctorProfileResponse,
     DoctorSearchResult,
+    DoctorProfileUpdateRequest,
+    NearbyDoctorResult,
     PatientRequestItem,
     PatientSummary,
 )
+from app.utils.link_utils import user_reference
+from app.utils.time_utils import utc_now
 
 logger = logging.getLogger(__name__)
 
@@ -39,13 +42,13 @@ async def search_doctor_by_id(doctor_id: str) -> DoctorSearchResult:
     """
     profile = await DoctorProfile.find_one(
         DoctorProfile.doctor_id == doctor_id.strip().upper(),
-        fetch_links=True,
     )
     if profile is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"No doctor found with ID '{doctor_id}'.",
         )
+    await profile.fetch_link(DoctorProfile.user)
     user: User = profile.user  # type: ignore[assignment]
     return DoctorSearchResult(
         user_id=str(user.id),
@@ -54,6 +57,8 @@ async def search_doctor_by_id(doctor_id: str) -> DoctorSearchResult:
         specialization=profile.specialization,
         experience=profile.experience,
         hospital=profile.hospital,
+        latitude=profile.latitude,
+        longitude=profile.longitude,
     )
 
 
@@ -64,8 +69,7 @@ async def get_doctor_profile(user_id: str) -> DoctorProfileResponse:
         raise HTTPException(status_code=404, detail="User not found.")
 
     profile = await DoctorProfile.find_one(
-        DoctorProfile.user.id == ObjectId(user_id),  # type: ignore[attr-defined]
-        fetch_links=True,
+        {"user": user_reference(user_id)},
     )
     if profile is None:
         raise HTTPException(status_code=404, detail="Doctor profile not found.")
@@ -81,19 +85,106 @@ async def get_doctor_profile(user_id: str) -> DoctorProfileResponse:
         hospital=profile.hospital,
         phone=profile.phone,
         bio=profile.bio,
+        latitude=profile.latitude,
+        longitude=profile.longitude,
     )
+
+
+async def update_doctor_profile(
+    user_id: str,
+    updates: DoctorProfileUpdateRequest,
+) -> DoctorProfileResponse:
+    """Apply partial updates to a doctor's profile, including practice location."""
+    user = await User.get(user_id)
+    if user is None:
+        raise HTTPException(status_code=404, detail="User not found.")
+
+    profile = await DoctorProfile.find_one(
+        {"user": user_reference(user_id)},
+    )
+    if profile is None:
+        raise HTTPException(status_code=404, detail="Doctor profile not found.")
+
+    update_data = updates.model_dump(exclude_none=True)
+    for field, value in update_data.items():
+        setattr(profile, field, value)
+    await profile.save()
+
+    return DoctorProfileResponse(
+        id=str(profile.id),
+        user_id=str(user.id),
+        doctor_id=profile.doctor_id,
+        full_name=user.full_name,
+        email=user.email,
+        specialization=profile.specialization,
+        experience=profile.experience,
+        hospital=profile.hospital,
+        phone=profile.phone,
+        bio=profile.bio,
+        latitude=profile.latitude,
+        longitude=profile.longitude,
+    )
+
+
+def _distance_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+    """Return the Haversine distance between two points in kilometers."""
+    earth_radius_km = 6371.0
+    d_lat = math.radians(lat2 - lat1)
+    d_lon = math.radians(lon2 - lon1)
+    start_lat = math.radians(lat1)
+    end_lat = math.radians(lat2)
+    haversine = (
+        math.sin(d_lat / 2) ** 2
+        + math.cos(start_lat) * math.cos(end_lat) * math.sin(d_lon / 2) ** 2
+    )
+    return 2 * earth_radius_km * math.asin(math.sqrt(haversine))
+
+
+async def get_nearby_doctors(
+    latitude: float,
+    longitude: float,
+    radius_km: float,
+) -> List[NearbyDoctorResult]:
+    """Return doctors with saved coordinates inside the requested radius."""
+    profiles = await DoctorProfile.find_all().to_list()
+
+    nearby: List[NearbyDoctorResult] = []
+    for profile in profiles:
+        if profile.latitude is None or profile.longitude is None:
+            continue
+
+        distance = _distance_km(latitude, longitude, profile.latitude, profile.longitude)
+        if distance > radius_km:
+            continue
+
+        await profile.fetch_link(DoctorProfile.user)
+        user: User = profile.user  # type: ignore[assignment]
+        nearby.append(NearbyDoctorResult(
+            user_id=str(user.id),
+            doctor_id=profile.doctor_id,
+            full_name=user.full_name,
+            specialization=profile.specialization,
+            experience=profile.experience,
+            hospital=profile.hospital,
+            latitude=profile.latitude,
+            longitude=profile.longitude,
+            distance_km=round(distance, 1),
+        ))
+
+    nearby.sort(key=lambda doctor: doctor.distance_km)
+    return nearby
 
 
 async def get_pending_requests(doctor_user_id: str) -> List[PatientRequestItem]:
     """Return all PENDING connection requests for the logged-in doctor."""
     requests = await DoctorPatientRequest.find(
-        DoctorPatientRequest.doctor.id == ObjectId(doctor_user_id),  # type: ignore[attr-defined]
+        {"doctor": user_reference(doctor_user_id)},
         DoctorPatientRequest.status == RequestStatus.PENDING,
-        fetch_links=True,
     ).to_list()
 
     result = []
     for req in requests:
+        await req.fetch_link(DoctorPatientRequest.patient)
         patient: User = req.patient  # type: ignore[assignment]
         result.append(PatientRequestItem(
             request_id=str(req.id),
@@ -119,10 +210,11 @@ async def respond_to_request(
         HTTPException 403: if the doctor doesn't own this request.
         HTTPException 409: if the request is already responded to.
     """
-    req = await DoctorPatientRequest.get(request_id, fetch_links=True)
+    req = await DoctorPatientRequest.get(request_id)
     if req is None:
         raise HTTPException(status_code=404, detail="Request not found.")
 
+    await req.fetch_link(DoctorPatientRequest.doctor)
     doctor: User = req.doctor  # type: ignore[assignment]
     if str(doctor.id) != doctor_user_id:
         raise HTTPException(status_code=403, detail="Not authorized to respond to this request.")
@@ -134,7 +226,7 @@ async def respond_to_request(
         )
 
     req.status = RequestStatus.ACCEPTED if accept else RequestStatus.REJECTED
-    req.responded_at = datetime.utcnow()
+    req.responded_at = utc_now()
     await req.save()
 
     action = "accepted" if accept else "rejected"
@@ -145,19 +237,19 @@ async def respond_to_request(
 async def get_accepted_patients(doctor_user_id: str) -> List[PatientSummary]:
     """Return list of patients connected to this doctor (accepted requests)."""
     requests = await DoctorPatientRequest.find(
-        DoctorPatientRequest.doctor.id == ObjectId(doctor_user_id),  # type: ignore[attr-defined]
+        {"doctor": user_reference(doctor_user_id)},
         DoctorPatientRequest.status == RequestStatus.ACCEPTED,
-        fetch_links=True,
     ).to_list()
 
     result = []
     for req in requests:
+        await req.fetch_link(DoctorPatientRequest.patient)
         patient: User = req.patient  # type: ignore[assignment]
         patient_profile = await PatientProfile.find_one(
-            PatientProfile.user.id == patient.id,  # type: ignore[attr-defined]
+            {"user": user_reference(patient.id)},
         )
         report_count = await MedicalReport.find(
-            MedicalReport.patient.id == patient.id,  # type: ignore[attr-defined]
+            {"patient": user_reference(patient.id)},
         ).count()
         result.append(PatientSummary(
             user_id=str(patient.id),
@@ -176,8 +268,8 @@ async def verify_patient_connection(doctor_user_id: str, patient_user_id: str) -
     Used to gate access to patient reports.
     """
     req = await DoctorPatientRequest.find_one(
-        DoctorPatientRequest.doctor.id == ObjectId(doctor_user_id),  # type: ignore[attr-defined]
-        DoctorPatientRequest.patient.id == ObjectId(patient_user_id),  # type: ignore[attr-defined]
+        {"doctor": user_reference(doctor_user_id)},
+        {"patient": user_reference(patient_user_id)},
         DoctorPatientRequest.status == RequestStatus.ACCEPTED,
     )
     return req is not None

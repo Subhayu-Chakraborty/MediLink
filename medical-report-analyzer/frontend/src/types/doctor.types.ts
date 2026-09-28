@@ -10,6 +10,8 @@ export interface DoctorProfile {
   hospital?: string
   phone?: string
   bio?: string
+  latitude?: number
+  longitude?: number
 }
 
 export interface DoctorSearchResult {
@@ -19,6 +21,22 @@ export interface DoctorSearchResult {
   specialization: string
   experience: number
   hospital?: string
+  latitude?: number
+  longitude?: number
+}
+
+export interface NearbyDoctorResult extends DoctorSearchResult {
+  distance_km: number
+}
+
+export interface DoctorProfileUpdate {
+  specialization?: string
+  experience?: number
+  hospital?: string
+  phone?: string
+  bio?: string
+  latitude?: number
+  longitude?: number
 }
 
 export interface PatientRequestItem {

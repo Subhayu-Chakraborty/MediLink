@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from typing import List, Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class DoctorProfileResponse(BaseModel):
@@ -23,6 +23,8 @@ class DoctorProfileResponse(BaseModel):
     hospital: Optional[str] = None
     phone: Optional[str] = None
     bio: Optional[str] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
 
 
 class DoctorSearchResult(BaseModel):
@@ -33,6 +35,24 @@ class DoctorSearchResult(BaseModel):
     specialization: str
     experience: int
     hospital: Optional[str] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+
+
+class NearbyDoctorResult(DoctorSearchResult):
+    """Doctor search result with calculated distance from the patient."""
+    distance_km: float
+
+
+class DoctorProfileUpdateRequest(BaseModel):
+    """Fields a doctor may update on their own profile."""
+    specialization: Optional[str] = None
+    experience: Optional[int] = Field(default=None, ge=0, le=80)
+    hospital: Optional[str] = None
+    phone: Optional[str] = None
+    bio: Optional[str] = None
+    latitude: Optional[float] = Field(default=None, ge=-90, le=90)
+    longitude: Optional[float] = Field(default=None, ge=-180, le=180)
 
 
 class RespondToRequestPayload(BaseModel):

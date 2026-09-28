@@ -15,6 +15,7 @@ from beanie import Document, Link
 from pydantic import Field
 
 from app.models.user import User
+from app.utils.time_utils import utc_now
 
 
 class ReportStatus(str, Enum):
@@ -41,7 +42,7 @@ class MedicalReport(Document):
     # Set after Ollama service runs — stores the full structured JSON
     analysis_result: Optional[Dict[str, Any]] = None
 
-    uploaded_at: datetime = Field(default_factory=datetime.utcnow)
+    uploaded_at: datetime = Field(default_factory=utc_now)
     analyzed_at: Optional[datetime] = None
     error_message: Optional[str] = None   # stores failure reason
 

@@ -4,8 +4,9 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "dev":     "vite",
-    "build":   "tsc && vite build",
+    "dev": "vite",
+    "dev:local": "node scripts/serve-local.mjs",
+    "build": "tsc && node scripts/serve-local.mjs --build-only",
     "preview": "vite preview",
     "lint":    "eslint src --ext ts,tsx --report-unused-disable-directives --max-warnings 0"
   },

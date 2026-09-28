@@ -33,23 +33,35 @@ class RegisterRequest(BaseModel):
     """Payload for POST /auth/register."""
     full_name: str = Field(..., min_length=2, max_length=100)
     email: EmailStr
-    password: str = Field(..., min_length=6)
+    password: str = Field(..., min_length=6, max_length=72)
     role: UserRole
 
     # Doctor-specific (required when role == doctor)
     specialization: Optional[str] = None
-    experience: Optional[int] = None
+    experience: Optional[int] = Field(default=None, ge=0, le=80)
     hospital: Optional[str] = None
+    latitude: Optional[float] = Field(default=None, ge=-90, le=90)
+    longitude: Optional[float] = Field(default=None, ge=-180, le=180)
 
     # Patient-specific (optional)
-    age: Optional[int] = None
+    age: Optional[int] = Field(default=None, ge=0, le=130)
     gender: Optional[str] = None
     phone: Optional[str] = None
 
+    @field_validator("role")
+    @classmethod
+    def prevent_public_admin_registration(cls, value: UserRole) -> UserRole:
+        if value == UserRole.ADMIN:
+            raise ValueError("Admin accounts cannot be created through public registration.")
+        return value
+
     @field_validator("specialization")
     @classmethod
-    def doctor_must_have_specialization(cls, v: Optional[str], info: object) -> Optional[str]:
-        return v
+    def normalize_specialization(cls, value: Optional[str]) -> Optional[str]:
+        if value is None:
+            return None
+        normalized = value.strip()
+        return normalized or None
 
 
 class LoginRequest(BaseModel):

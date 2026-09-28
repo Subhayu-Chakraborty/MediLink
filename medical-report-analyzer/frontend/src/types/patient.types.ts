@@ -13,6 +13,7 @@ export interface PatientProfile {
 
 export interface DoctorRequestStatus {
   request_id: string
+  doctor_user_id: string
   doctor_id: string
   doctor_name: string
   doctor_specialization: string

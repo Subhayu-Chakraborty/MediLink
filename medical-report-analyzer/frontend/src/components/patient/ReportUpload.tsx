@@ -16,7 +16,6 @@ type Stage = 'idle' | 'uploading' | 'uploaded' | 'analyzing' | 'done' | 'error'
 const ReportUpload: FC<ReportUploadProps> = ({ onUploaded }) => {
   const [stage, setStage] = useState<Stage>('idle')
   const [file, setFile] = useState<File | null>(null)
-  const [report, setReport] = useState<ReportUploadResponse | null>(null)
   const [error, setError] = useState('')
   const [dragOver, setDragOver] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -33,7 +32,6 @@ const ReportUpload: FC<ReportUploadProps> = ({ onUploaded }) => {
     setFile(f)
     setError('')
     setStage('idle')
-    setReport(null)
   }
 
   const handleUpload = async () => {
@@ -42,7 +40,6 @@ const ReportUpload: FC<ReportUploadProps> = ({ onUploaded }) => {
     setError('')
     try {
       const res = await uploadReport(file)
-      setReport(res)
       setStage('uploaded')
       // Immediately trigger analysis
       setStage('analyzing')
@@ -57,7 +54,7 @@ const ReportUpload: FC<ReportUploadProps> = ({ onUploaded }) => {
   }
 
   const reset = () => {
-    setStage('idle'); setFile(null); setReport(null); setError('')
+    setStage('idle'); setFile(null); setError('')
     if (inputRef.current) inputRef.current.value = ''
   }
 
